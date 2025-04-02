@@ -1,7 +1,12 @@
 use anchor_lang::prelude::*;
+// use anchor_lang::solana_program::{pubkey::Pubkey};
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
-
+use chainlink_solana as chainlink;
 declare_id!("5AoXpoEbwgDJSov7aePF2ofiMVBNsFhBMJkqjpMXWWGX");
+
+// program & feed in devnet
+// pub const CHAINLINK_PROGRAM_ID: &str = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
+// pub const SOL_USD_FEED: &str = "HgTtcbcmp5BeThax5AU8vg4VwK79qAvAKKFMs8txMLW6";
 
 // write anchor program for: - game Bravencia cần payment qua chain Solana
 // - token Bravancia có tên là BVC
@@ -33,17 +38,15 @@ pub mod bravencia_program {
         let bvc_amount = (usd_value * 10.0).round() as u64;
 
         // Emit deposit event
-        emit_deposit_event(
-            DepositEvent {
-                user_wallet: ctx.accounts.user_wallet.key(),
-                deposit_amount: amount,
-                deposit_currency: "USDC".to_string(),
-                usd_value,
-                bvc_amount,
-                admin_wallet: ctx.accounts.admin_usdc_account.owner,
-                tx_signature: ctx.accounts.user_wallet.key().to_string(), // Simplified for example
-            },
-        )?;
+        emit_deposit_event(DepositEvent {
+            user_wallet: ctx.accounts.user_wallet.key(),
+            deposit_amount: amount,
+            deposit_currency: "USDC".to_string(),
+            usd_value,
+            bvc_amount,
+            admin_wallet: ctx.accounts.admin_usdc_account.owner,
+            tx_signature: ctx.accounts.user_wallet.key().to_string(), // Simplified for example
+        })?;
 
         Ok(())
     }
@@ -60,77 +63,86 @@ pub mod bravencia_program {
         anchor_lang::solana_program::program::invoke(
             &transfer_ix,
             &[
-                ctx.accounts.user_wallet.to_account_info(),
-                ctx.accounts.admin_wallet.to_account_info(),
+                ctx.accounts.user_wallet.to_account_info(), // from account.clone
+                ctx.accounts.admin_wallet.to_account_info(), // to account.clone
                 ctx.accounts.system_program.to_account_info(),
             ],
         )?;
 
-        let sol_price = get_sol_price()?;
+        let round = chainlink::latest_round_data(
+            ctx.accounts.chainlink_program.to_account_info(),
+            ctx.accounts.chainlink_feed.to_account_info(),
+        )?;
 
+        // Price is returned with 8 decimal places
+        let sol_price = round.answer as f64 / 1_000_000_00.0;
         // Calculate USD value and BVC amount
         let sol_amount = amount as f64 / 1_000_000_000.0; // SOL has 9 decimals
         let usd_value = sol_amount * sol_price;
         let bvc_amount = (usd_value * 10.0).round() as u64; // 10 BVC per 1 USD
 
         // Emit deposit event
-        emit_deposit_event(
-            DepositEvent {
-                user_wallet: ctx.accounts.user_wallet.key(),
-                deposit_amount: amount,
-                deposit_currency: "SOL".to_string(),
-                usd_value,
-                bvc_amount,
-                admin_wallet: ctx.accounts.admin_wallet.key(),
-                tx_signature: ctx.accounts.user_wallet.key().to_string(), // Simplified for example
-            },
-        )?;
+        emit_deposit_event(DepositEvent {
+            user_wallet: ctx.accounts.user_wallet.key(),
+            deposit_amount: amount,
+            deposit_currency: "SOL".to_string(),
+            usd_value,
+            bvc_amount,
+            admin_wallet: ctx.accounts.admin_wallet.key(),
+            tx_signature: ctx.accounts.user_wallet.key().to_string(), // Simplified for example
+        })?;
 
         Ok(())
     }
 }
 
-fn get_sol_price() -> Result<f64> {
-  Ok(100.0) // $100 per SOL 
-}
+// fn get_sol_price() -> Result<f64> {
+//   Ok(100.0) // $100 per SOL
+// }
 
 // Emit deposit event
 fn emit_deposit_event(event: DepositEvent) -> Result<()> {
-  emit!(event);
-  Ok(())
+    emit!(event);
+    Ok(())
 }
 
 // Context for USDC deposit
 #[derive(Accounts)]
 pub struct DepositUsdc<'info> {
-  #[account(mut)]
-  pub user_usdc_account: Account<'info, TokenAccount>,
-  #[account(mut)]
-  pub admin_usdc_account: Account<'info, TokenAccount>,
-  #[account(mut, signer)]
-  pub user_wallet: AccountInfo<'info>,
-  pub token_program: Program<'info, Token>,
-  pub system_program: Program<'info, System>,
+    #[account(mut)]
+    pub user_usdc_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub admin_usdc_account: Account<'info, TokenAccount>,
+    #[account(mut, signer)]
+    pub user_wallet: AccountInfo<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
 
 // Context for SOL deposit
 #[derive(Accounts)]
 pub struct DepositSol<'info> {
-  #[account(mut, signer)]
-  pub user_wallet: AccountInfo<'info>,
-  #[account(mut)]
-  pub admin_wallet: AccountInfo<'info>,
-  pub system_program: Program<'info, System>,
+    #[account(mut, signer)]
+    pub user_wallet: AccountInfo<'info>,
+    #[account(mut)]
+    pub admin_wallet: AccountInfo<'info>,
+    // CHECK: Chainlink feed account
+    #[account(mut)]
+    pub chainlink_feed: AccountInfo<'info>,
+    // CHECK: Chainlink program account
+    #[account(mut)]
+    pub chainlink_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 // Event structure
 #[event]
 pub struct DepositEvent {
-  pub user_wallet: Pubkey,      // User's wallet address
-  pub deposit_amount: u64,      // Amount deposited
-  pub deposit_currency: String, // "USDC" or "SOL"
-  pub usd_value: f64,           // USD value of deposit
-  pub bvc_amount: u64,          // Equivalent BVC amount (10 BVC per 1 USD)
-  pub admin_wallet: Pubkey,     // Admin wallet that received funds
-  pub tx_signature: String,     // Transaction signature for reference
+    pub user_wallet: Pubkey,      // User's wallet address
+    pub deposit_amount: u64,      // Amount deposited
+    pub deposit_currency: String, // "USDC" or "SOL"
+    pub usd_value: f64,           // USD value of deposit
+    pub bvc_amount: u64,          // Equivalent BVC amount (10 BVC per 1 USD)
+    pub admin_wallet: Pubkey,     // Admin wallet that received funds
+    pub tx_signature: String,     // Transaction signature for reference
 }

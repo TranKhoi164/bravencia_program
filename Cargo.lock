@@ -190,6 +190,7 @@ dependencies = [
  "anchor-derive-accounts",
  "anchor-derive-serde",
  "anchor-derive-space",
+ "anchor-syn",
  "arrayref",
  "base64 0.13.1",
  "bincode",
@@ -592,6 +593,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "chainlink_solana",
 ]
 
 [[package]]
@@ -673,6 +675,17 @@ name = "cfg_aliases"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+
+[[package]]
+name = "chainlink_solana"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44e1a6c94acdef947c091751143a1271c433fe140ed045888c0a1248330b1647"
+dependencies = [
+ "borsh 0.9.3",
+ "borsh-derive 0.9.3",
+ "solana-program",
+]
 
 [[package]]
 name = "chrono"

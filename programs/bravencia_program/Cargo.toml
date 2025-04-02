@@ -14,7 +14,9 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-spl/idl-build", "anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = "0.29.0"
 anchor-spl = "0.29.0"
+chainlink_solana = "0.1.0"

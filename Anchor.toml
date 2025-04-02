@@ -11,8 +11,12 @@ bravencia_program = "5AoXpoEbwgDJSov7aePF2ofiMVBNsFhBMJkqjpMXWWGX"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "/root/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+timeout = 60000 
+concurrent = false
